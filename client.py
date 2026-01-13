@@ -255,7 +255,7 @@ def card_to_string(card):
 
 
 def print_hand(cards):
-    return " ".join([card_to_string(c) for c in cards])
+    return "    ".join([card_to_string(c) for c in cards])
 
 
 if __name__ == "__main__":

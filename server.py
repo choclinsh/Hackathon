@@ -69,7 +69,7 @@ def send_offers(udp_socket, server_name, tcp_port):
     print(f"Server started, broadcasting on {broadcast_ip}")
 
     while True:
-        udp_socket.sendto(offer_msg, ('<broadcast>', 13122))
+        udp_socket.sendto(offer_msg, (broadcast_ip, 13122))  # send with the calculated ip
         time.sleep(1)
 
 
@@ -221,9 +221,9 @@ def print_hand(cards):
 
 def get_local_ip():
     """
-    Clever trick to find the real IP address of this computer.
-    We don't actually connect to Google (8.8.8.8), but asking the OS
-    'how would I get there?' reveals the correct network adapter IP.
+    This reveals which IP your computer would use for external communication.
+    By requesting the network interface that would be used in sanding data to 8.8.8.8 (Google).
+    The OS just figures out the routing internally.
     """
     s = socket(AF_INET, SOCK_DGRAM)
     try:
