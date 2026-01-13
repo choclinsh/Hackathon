@@ -13,9 +13,11 @@ PAYLOAD_TYPE = 0x4
 
 def run_server():
     server_name = "Team Adnan"
+    # Set up tcp socket
     server_socket = socket(AF_INET, SOCK_STREAM)
     server_socket.bind(('', 0))
-    server_ip, server_port = server_socket.getsockname()
+    server_ip = get_local_ip()
+    _, server_port = server_socket.getsockname()
     server_socket.listen()
     print(f"Server started, listening on IP {server_ip} and port {server_port}")
 
@@ -23,6 +25,7 @@ def run_server():
     udp_socket = socket(AF_INET, SOCK_DGRAM)
     udp_socket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
+    # A thread that send udp offers in parallel
     broadcaster = threading.Thread(target=send_offers, args=(udp_socket, server_name, server_port))
     broadcaster.daemon = True
     broadcaster.start()
@@ -42,7 +45,6 @@ def run_server():
                 print(f"\nRound {round_num}/{rounds_number} with '{client_name}'")
                 deck = create_deck()
                 random.shuffle(deck)
-                # We don't print the return value here, we print inside the function or log it
                 result = play_round(client_conn, client_name, deck)
                 print(f"Round finished. Result: {result}")
 
@@ -59,8 +61,8 @@ def send_offers(udp_socket, server_name, tcp_port):
 
     my_ip = get_local_ip()
 
-    # 2. Calculate the Broadcast IP (e.g., 172.1.0.255)
-    # We assume a standard /24 network (common in labs/homes)
+    # Calculate the Broadcast IP
+    # We assume a standard /24 network
     ip_parts = my_ip.split('.')
     broadcast_ip = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.255"
 
@@ -74,7 +76,8 @@ def send_offers(udp_socket, server_name, tcp_port):
 def get_request(client_conn):
     try:
         data = client_conn.recv(1024)
-        if len(data) < 38: return 0, ""
+        if len(data) < 38:
+            return 0, ""
 
         unpacked = struct.unpack('!IBB32s', data[:38])
         if unpacked[0] != MAGIC_COOKIE or unpacked[1] != REQUEST_TYPE:
@@ -83,6 +86,7 @@ def get_request(client_conn):
         rounds = unpacked[2]
         name = unpacked[3].decode('utf-8').rstrip('\x00')
         return rounds, name
+
     except Exception as e:
         return 0, ""
 
@@ -92,14 +96,12 @@ def play_round(client_socket, client_name, deck):
     dealer_cards = [deck.pop(), deck.pop()]
 
     player_total = sum(calculate_card_value(card) for card in player_cards)
-    # Only calculate dealer total based on what is visible?
-    # Logic: Dealer has 2 cards, one hidden. But for total check we track real total.
     dealer_total = sum(calculate_card_value(card) for card in dealer_cards)
 
-    print(f"Player cards: {print_hand(player_cards)}")
+    print(f"{client_name}'s cards: {print_hand(player_cards)}")
     print(f"Dealer showing: {card_to_string(dealer_cards[0])}")
 
-    # 1. Send Player Cards
+    # Send Player Cards
     # Check for immediate bust (Double Ace = 22)
     if player_total > 21:
         send_card(client_socket, player_cards[0], 0)  # Active
@@ -134,7 +136,7 @@ def play_round(client_socket, client_name, deck):
             print("Client disconnected or invalid choice.")
             return "Error"
 
-    # 4. Dealer Turn
+    # Dealer Turn
     # Reveal second card
     print(f"Dealer reveals hidden card: {card_to_string(dealer_cards[1])}")
     send_card(client_socket, dealer_cards[1], 0)
@@ -151,7 +153,7 @@ def play_round(client_socket, client_name, deck):
         else:
             send_card(client_socket, card, 0)  # Active
 
-    # 5. Determine Winner
+    # Determine Winner
     if player_total > dealer_total:
         send_result(client_socket, 3)  # Win
         return "Player won"
@@ -164,12 +166,10 @@ def play_round(client_socket, client_name, deck):
 
 
 def receive_player_decision(client_socket):
-    # FIX: Read 10 bytes (Header 4+1 + Decision 5)
     data = client_socket.recv(10)
     if len(data) < 10:
         return None
 
-    # FIX: Unpack using '5s' for string, NOT 'BHB'
     unpacked = struct.unpack('!IB5s', data)
     magic = unpacked[0]
     decision = unpacked[2].decode('utf-8')
@@ -182,7 +182,6 @@ def receive_player_decision(client_socket):
 
 def send_result(client_socket, result_code):
     """Send round result to client (Type 4, no card)"""
-    # FIX: Use 'H' and 'B' dummy values to match the 9-byte format the client expects
     payload_msg = struct.pack('!IBBHB', MAGIC_COOKIE, PAYLOAD_TYPE, result_code, 0, 0)
     client_socket.send(payload_msg)
 
@@ -192,7 +191,6 @@ def send_card(client_socket, card, result_code):
     client_socket.send(payload_msg)
 
 
-# ... Helper functions (createDeck, calculate, etc) remain the same ...
 def create_deck():
     deck = []
     for suit in range(4):
@@ -230,12 +228,12 @@ def get_local_ip():
     s = socket(AF_INET, SOCK_DGRAM)
     try:
         s.connect(('8.8.8.8', 1))
-        IP = s.getsockname()[0]
+        ip = s.getsockname()[0]
     except Exception:
-        IP = '127.0.0.1'
+        ip = '127.0.0.1'
     finally:
         s.close()
-    return IP
+    return ip
 
 
 if __name__ == "__main__":
