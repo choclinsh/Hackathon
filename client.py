@@ -15,7 +15,7 @@ def run_client():
     # Client runs forever until we kill it manually
     while True:
         tcp_socket = None
-
+        print("Client started, listening for offer requests...")
         # UDP Listening (Waiting for a server)
         try:
             client_offers_receiver = socket.socket(AF_INET, SOCK_DGRAM)

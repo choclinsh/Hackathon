@@ -35,24 +35,29 @@ def run_server():
             client_conn, client_addr = server_socket.accept()
             print(f"Client connected from {client_addr}")
 
-            rounds_number, client_name = get_request(client_conn)
-            if rounds_number == 0:
-                client_conn.close()
-                continue
-
-            # Loop for the requested number of rounds
-            for round_num in range(1, rounds_number + 1):
-                print(f"\nRound {round_num}/{rounds_number} with '{client_name}'")
-                deck = create_deck()
-                random.shuffle(deck)
-                result = play_round(client_conn, client_name, deck)
-                print(f"Round finished. Result: {result}")
-
-            print(f"Finished all rounds with {client_name}. Closing connection.")
-            client_conn.close()
+            client_thread = threading.Thread(target=process_client, args=(client_conn, client_addr))
+            client_thread.start()
 
         except Exception as e:
             print(f"Server error: {e}")
+
+
+def process_client(client_conn, client_addr):
+    rounds_number, client_name = get_request(client_conn)
+    if rounds_number == 0:
+        client_conn.close()
+        return
+
+    # Loop for the requested number of rounds
+    for round_num in range(1, rounds_number + 1):
+        print(f"\nRound {round_num}/{rounds_number} with '{client_name}'")
+        deck = create_deck()
+        random.shuffle(deck)
+        result = play_round(client_conn, client_name, deck)
+        print(f"Round finished. Result: {result}")
+
+    print(f"Finished all rounds with {client_name}. Closing connection.")
+    client_conn.close()
 
 
 def send_offers(udp_socket, server_name, tcp_port):
