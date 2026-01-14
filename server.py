@@ -67,7 +67,6 @@ def send_offers(udp_socket, server_name, tcp_port):
     my_ip = get_local_ip()
 
     # Calculate the Broadcast IP
-    # We assume a standard /24 network
     ip_parts = my_ip.split('.')
     broadcast_ip = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.255"
 
@@ -115,10 +114,10 @@ def play_round(client_socket, client_name, deck):
         for card in player_cards:
             send_card(client_socket, card, 0)  # Active
 
-    # 2. Send Dealer's first card
+    # Send Dealer's first card
     send_card(client_socket, dealer_cards[0], 0)
 
-    # 3. Player Turn
+    # Player Turn
     while player_total <= 21:
         choice = receive_player_decision(client_socket)
 

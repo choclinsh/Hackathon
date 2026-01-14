@@ -16,30 +16,17 @@ def run_client():
     while True:
         tcp_socket = None
         print("Client started, listening for offer requests...")
-        # UDP Listening (Waiting for a server)
         try:
+            #create UDP
             client_offers_receiver = socket.socket(AF_INET, SOCK_DGRAM)
-
-            # This is crucial for testing on the same machine to avoid "Address in use" errors
             client_offers_receiver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-            # Bind to the specific broadcast port defined in the spec
             client_offers_receiver.bind(('', 13122))
-
-            # Block here until we get a broadcast packet
             data, server_address = client_offers_receiver.recvfrom(1024)
             server_ip = server_address[0]
-
-            # Basic sanity check on packet size before unpacking
             if len(data) < 39:
                 print("Packet ignored (too short).")
                 continue
-
-            # Unpack the offer packet:
-            # I = Cookie (4 bytes), B = Type (1 byte), H = Port (2 bytes), 32s = Name (32 bytes)
             unpacked = struct.unpack('!IBH32s', data[:39])
-
-            # Verify protocol integrity
             if unpacked[0] != MAGIC_COOKIE:
                 print(f"Invalid cookie: {hex(unpacked[0])}")
                 continue
@@ -49,37 +36,27 @@ def run_client():
 
             # Extract server details to connect
             tcp_port = unpacked[2]
-            # Clean up the name (remove the null padding bytes)
             server_name = unpacked[3].decode('utf-8').rstrip('\x00')
-
             # We found a server, so we can stop listening for offers now
             client_offers_receiver.close()
-
             # Establish TCP Connection
             tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             tcp_socket.connect((server_ip, tcp_port))
 
-            # Send Game Request
             num_rounds = get_valid_rounds()
-
             # The name field must be exactly 32 bytes, padded with nulls if shorter
             padded_name = client_name.encode('utf-8').ljust(32, b'\x00')
-
             # Pack the request message according to protocol
             request_msg = struct.pack('!IBB32s', MAGIC_COOKIE, REQUEST_TYPE, num_rounds, padded_name)
             tcp_socket.send(request_msg)
-
             print(f"Request sent for {num_rounds} rounds.")
             print(f"Playing with {server_name}'s server")
-
-            # Enter Game Loop
             play_games(tcp_socket, num_rounds, client_name)
 
         except Exception as e:
             print(f"Client Loop Exception: {e}")
 
         finally:
-            # Always clean up the socket to prevent resource leaks
             if tcp_socket:
                 tcp_socket.close()
             print("Socket closed. Restarting loop...")
@@ -88,16 +65,13 @@ def run_client():
 def play_games(tcp_socket, num_rounds, client_name):
     counter = 0
     wins, losses, ties = 0, 0, 0
-
     while counter < num_rounds:
         print(f"\nROUND {counter + 1}!")
-
-        # 1. Get the initial 3 cards (2 for me, 1 for dealer)
+        # Get the initial 3 cards (2 for client, 1 for dealer)
         player_cards, status = start_clients_turn(tcp_socket)
         if not player_cards:
             print("Failed to receive initial cards.")
             break
-
         # The last card received in the startup batch is the dealer's visible card
         dealer_first_card = player_cards.pop()
         dealer_cards = [dealer_first_card]
@@ -163,7 +137,6 @@ def start_clients_turn(tcp_socket):
             if len(data) < 9:
                 return [], 0
 
-            # Unpack: Magic(4) + Type(1) + Status(1) + Rank(2) + Suit(1)
             unpacked = struct.unpack('!IBBHB', data)
             status = unpacked[2]
             card = {'rank': unpacked[3], 'suit': unpacked[4]}
@@ -201,7 +174,7 @@ def dealer_turn(tcp_socket, dealer_cards):
         rank = unpacked[3]
         suit = unpacked[4]
 
-        # If rank is not 0, it's a real card the dealer drew
+        # If rank is not 0, it's a card and not a score message
         if rank != 0:
             card = {'rank': rank, 'suit': suit}
             dealer_cards.append(card)
@@ -248,7 +221,6 @@ def get_valid_choice():
 
 
 def card_to_string(card):
-    # Map internal numbers to pretty symbols for the user
     ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
     suits = ['♥', '♦', '♣', '♠']
     return f"{ranks[card['rank'] - 1]}{suits[card['suit']]}"
