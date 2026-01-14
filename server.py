@@ -35,14 +35,14 @@ def run_server():
             client_conn, client_addr = server_socket.accept()
             print(f"Client connected from {client_addr}")
 
-            client_thread = threading.Thread(target=process_client, args=(client_conn, client_addr))
+            client_thread = threading.Thread(target=process_client, args=(client_conn, ))
             client_thread.start()
 
         except Exception as e:
             print(f"Server error: {e}")
 
 
-def process_client(client_conn, client_addr):
+def process_client(client_conn):
     rounds_number, client_name = get_request(client_conn)
     if rounds_number == 0:
         client_conn.close()
